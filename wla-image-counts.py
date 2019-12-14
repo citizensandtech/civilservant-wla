@@ -17,7 +17,7 @@
 import bz2, codecs, csv, zipfile, glob, re, csv, pymysql, os, datetime, urllib, sys
 import csv, json, argparse, sys, datetime, os, re, time, bz2
 from collections import defaultdict, Counter
-from dateutil import parser
+# from dateutil import parser
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
@@ -66,9 +66,9 @@ FIELDS = [
 
 wiki_database = "commonswiki_p"
 
-constr = 'mysql+pymysql://{user}:{pwd}@{host}/DB?charset=utf8'.format(user=os.environ['MYSQL_USERNAME'],
-                                                      pwd=os.environ['MYSQL_PASSWORD'],
-                                                      host=os.environ['MYSQL_HOST'],
+constr = 'mysql+pymysql://{user}:{pwd}@{host}/commonswiki_p?charset=utf8'.format(user=os.environ['WMF_MYSQL_USERNAME'],
+                                                      pwd=os.environ['WMF_MYSQL_PASSWORD'],
+                                                      host=os.environ['WMF_MYSQL_HOST'],
                                                                      use_unicode=True)
 
 con = create_engine(constr, encoding='utf-8')
@@ -89,7 +89,7 @@ def decode_or_nan(b):
     
 use_commons_exec()
 
-wla_years = [2014,2015,2016,2017]
+wla_years = [2014,2015,2016,2017,2019]
 
 
 # In[4]:
@@ -98,14 +98,14 @@ wla_years = [2014,2015,2016,2017]
 def get_wla_image_titles_from_year(year):
     year_category = f"Images_from_Wiki_Loves_Africa_{year}"
     print(f"Year category is: {year_category}")
-    year_cat_sql = f'''        SELECT img_user_text, img_name 
+    year_cat_sql = f'''        SELECT img_actor, img_name 
             FROM image, page, categorylinks
             WHERE page.page_id=categorylinks.cl_from 
                AND image.img_name = page.page_title
                AND .categorylinks.cl_to = "{year_category}"'''
     use_commons_exec()
     year_cat_df = pd.read_sql(year_cat_sql, con)
-    year_cat_df['img_user_text'] = year_cat_df['img_user_text'].apply(decode_or_nan)
+    # year_cat_df['img_actor'] = year_cat_df['img_actor'].apply(decode_or_nan)
     year_cat_df['img_name'] = year_cat_df['img_name'].apply(decode_or_nan)
     year_cat_df['year']=year
     print(f"Number results are: {len(year_cat_df)}")
