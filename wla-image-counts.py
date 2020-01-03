@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # # Goal
@@ -17,7 +16,7 @@
 import bz2, codecs, csv, zipfile, glob, re, csv, pymysql, os, datetime, urllib, sys
 import csv, json, argparse, sys, datetime, os, re, time, bz2
 from collections import defaultdict, Counter
-from dateutil import parser
+# from dateutil import parser
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
@@ -55,8 +54,8 @@ FIELDS = [
     "total_transfers_movie_480plus",
     "reserved21",
     "reserved22",
-    "total_transfers_refer_wmf",
-    "total_transfers_refer_nonwmf",
+    "total_transfers_refer_wm",
+    "total_transfers_refer_nonwm",
     "total_transfers_refer_invalid"
 ]
 
@@ -66,15 +65,17 @@ FIELDS = [
 
 wiki_database = "commonswiki_p"
 
-constr = 'mysql+pymysql://{user}:{pwd}@{host}/DB?charset=utf8'.format(user=os.environ['MYSQL_USERNAME'],
-                                                      pwd=os.environ['MYSQL_PASSWORD'],
-                                                      host=os.environ['MYSQL_HOST'],
+print("environment variables are: {e}".format(e=os.environ))
+
+constr = 'mysql+pymysql://{user}:{pwd}@{host}/commonswiki_p?charset=utf8'.format(user=os.environ['WMF_MYSQL_USERNAME'],
+                                                      pwd=os.environ['WMF_MYSQL_PASSWORD'],
+                                                      host=os.environ['WMF_MYSQL_HOST'],
                                                                      use_unicode=True)
 
 con = create_engine(constr, encoding='utf-8')
 
 def use_commons_exec():
-    con.execute(f'use commonswiki_p;')
+    con.execute('use commonswiki_p;')
     
 def wmftimestamp(bytestring):
     if bytestring:
@@ -89,26 +90,26 @@ def decode_or_nan(b):
     
 use_commons_exec()
 
-wla_years = [2014,2015,2016,2017]
+wla_years = [2014,2015,2016,2017,2019]
 
 
 # In[4]:
 
 
 def get_wla_image_titles_from_year(year):
-    year_category = f"Images_from_Wiki_Loves_Africa_{year}"
-    print(f"Year category is: {year_category}")
-    year_cat_sql = f'''        SELECT img_user_text, img_name 
+    year_category = "Images_from_Wiki_Loves_Africa_{year}".format(year=year)
+    print("Year category is: {year_category}".format(year_category=year_category))
+    year_cat_sql = '''        SELECT img_actor, img_name 
             FROM image, page, categorylinks
             WHERE page.page_id=categorylinks.cl_from 
                AND image.img_name = page.page_title
-               AND .categorylinks.cl_to = "{year_category}"'''
+               AND .categorylinks.cl_to = "{year_category}"'''.format(year_category=year_category)
     use_commons_exec()
     year_cat_df = pd.read_sql(year_cat_sql, con)
-    year_cat_df['img_user_text'] = year_cat_df['img_user_text'].apply(decode_or_nan)
+    # year_cat_df['img_actor'] = year_cat_df['img_actor'].apply(decode_or_nan)
     year_cat_df['img_name'] = year_cat_df['img_name'].apply(decode_or_nan)
     year_cat_df['year']=year
-    print(f"Number results are: {len(year_cat_df)}")
+    print("Number results are: {nr}".format(nr=len(year_cat_df)))
     return year_cat_df
 
 
@@ -159,17 +160,18 @@ def process(datafile, query):
 
 
 def parse_mediacounts(tsvs, target_filenames):
-    print(f'Looking at {len(tsvs)} TSVs')
+    print('Looking at {nr} TSVs'.format(nr=len(tsvs)))
     query = target_filenames
     log("Searching statistics for %d files" % len(query))
     match_rows_dfs = []
     for tsv in tsvs:
         cache_key = os.path.basename(tsv)
-        cache_file = f'cache/{cache_key}.result.pickle'
+        cache_file = 'cache/{cache_key}.result.pickle'.format(cache_key=cache_key)
         if os.path.exists(cache_file):
             match_rows_df = pd.read_pickle(cache_file)
             match_rows_dfs.append(match_rows_df)
             sys.stdout.write('c')
+            sys.stdout.flush()
         else:
             now = time.time()
             match_rows = process(tsv, query)
@@ -179,6 +181,7 @@ def parse_mediacounts(tsvs, target_filenames):
             match_rows_df.to_pickle(cache_file)
             match_rows_dfs.append(match_rows_df)
             log("%s took %s seconds" % (tsv, round(time.time() - now, 2)))
+            sys.stdout.flush()
     return match_rows_dfs
 
 
@@ -195,12 +198,18 @@ def make_wla_views_counts_df(year):
     tsvs_rel = [path for path in tsvs_all_year_files if '.tsv.bz2' in path]
     tsvs = [os.path.join(tsvs_year, f) for f in tsvs_rel]
     tsvs = sorted(tsvs)
-    match_rows_tsv = parse_mediacounts(tsvs, target_filenames)
+
+    outfile = 'output/wla_mediacounts_{year}.csv'.format(year=year)
+    if not os.path.exists(outfile):
+        match_rows_tsv = parse_mediacounts(tsvs, target_filenames)
     
-    counts_df = pd.concat(match_rows_tsv)
-    outfile = f'output/wla_mediacounts_{year}.csv'
-    print(f'saving outfile: {outfile}')
-    counts_df.to_csv(outfile, index=False)
+        counts_df = pd.concat(match_rows_tsv)
+        print('saving outfile: {outfile}'.format(outfile=outfile))
+        counts_df.to_csv(outfile, index=False)
+    else:
+        # counts_df = pd.read_csv(outfile) # commenting to save on memory
+        counts_df = pd.DataFrame()
+        print('{outfile} already exists, not recomputing'.format(outfile=outfile))
     return counts_df
 
 
