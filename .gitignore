@@ -1,1 +1,7 @@
 .env
+
+\.idea/
+
+lib/
+
+ipython/\.ipynb_checkpoints/
